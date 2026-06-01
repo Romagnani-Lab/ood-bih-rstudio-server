@@ -14,8 +14,8 @@ attributes:
     label: "R environment source"
     help: "R is provided through a conda or pixi environment."
     options:
-      - [ "Conda environment", "conda", data-set-conda-path: "~/work/bin/miniforge3/bin:R_4.3.3" ]
-      - [ "Pixi environment", "pixi", data-set-pixi-path: "~/work/bin/pixi/R_4.4.0" ]
+      - [ "Conda environment", "conda", data-set-conda-path: "~/work/bin/miniforge3/bin:R_4.3.3", data-hide-pixi-path: true ]
+      - [ "Pixi environment", "pixi", data-set-pixi-path: "~/work/bin/pixi/R_4.4.0", data-hide-conda-path: true ]
   conda_path:
     widget: "text_field"
     label: "Path to conda environment"
