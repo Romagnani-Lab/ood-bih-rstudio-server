@@ -2,19 +2,16 @@
 
 set -x
 
-<%-
-working_dir_host = '${PWD}'
-working_dir_container = working_dir_host
-%>
+<%- working_dir = '${PWD}' %>
 
 #
 # Start RStudio Server
 #
 
 # PAM auth helper used by RStudio
-export RSTUDIO_AUTH=$(readlink -f "<%= working_dir_container %>/bin/auth")
+export RSTUDIO_AUTH=$(readlink -f "<%= working_dir %>/bin/auth")
 
-source "<%= working_dir_container %>/.env"
+source "<%= working_dir %>/.env"
 
 <% if context.r_provider == "conda" && !context.conda_path.to_s.empty? %>
 <% conda = context.conda_path.split(":") -%>
@@ -30,10 +27,10 @@ export RSTUDIO_WHICH_R=$(which R)
 <% end %>
 
 # Generate an `rsession` wrapper script
-export RSESSION_WRAPPER_FILE="<%= working_dir_container %>/rsession.sh"
+export RSESSION_WRAPPER_FILE="<%= working_dir %>/rsession.sh"
 (
 umask 077
-sed 's/^ \{2\}//' > "<%= working_dir_host %>/rsession.sh" << EOL
+sed 's/^ \{2\}//' > "<%= working_dir %>/rsession.sh" << EOL
   #!/usr/bin/env bash
 
   set -x
@@ -51,7 +48,7 @@ sed 's/^ \{2\}//' > "<%= working_dir_host %>/rsession.sh" << EOL
 <% end -%>
 
   # Log all output from this script
-  export RSESSION_LOG_FILE="<%= working_dir_container %>/rsession.log"
+  export RSESSION_LOG_FILE="<%= working_dir %>/rsession.log"
 
   exec &>>"\${RSESSION_LOG_FILE}"
 
@@ -78,7 +75,7 @@ sed 's/^ \{2\}//' > "<%= working_dir_host %>/rsession.sh" << EOL
   exec rsession $(if [[ ! -z "${R_LIBS_USER}" ]]; then echo --r-libs-user "${R_LIBS_USER}"; fi) "\${@}"
 EOL
 )
-chmod 700 "<%= working_dir_host %>/rsession.sh"
+chmod 700 "<%= working_dir %>/rsession.sh"
 
 # Set working directory to home directory
 cd "${HOME}"
@@ -91,19 +88,17 @@ set -x
 echo "Starting up rserver..."
 
 # Dump environment without functions for use in rsession.sh, filtering readonly variables
-(set -o posix; set) | grep -vP '^(BASHOPTS|BASH_VERSINFO|EUID|PPID|SHELLOPTS|UID)' > "<%= working_dir_container %>/.env"
+(set -o posix; set) | grep -vP '^(BASHOPTS|BASH_VERSINFO|EUID|PPID|SHELLOPTS|UID)' > "<%= working_dir %>/.env"
 
 SERVER_DATA_DIR=$(TMPDIR=/tmp mktemp -d)
 mkdir -p ${SERVER_DATA_DIR}/var/{lib,run}
 chmod a+rw ${SERVER_DATA_DIR}/var/run
 chmod +t ${SERVER_DATA_DIR}/var/run
 
-CLUSTER_USER=$(echo $USER | sed -e 's/@CHARITE/_c/' -e 's/@MDC-BERLIN/_m/')
-
 # Set up bind mounts
 BINDS=/data,${SERVER_DATA_DIR}/var/lib:/var/lib/rstudio-server,${SERVER_DATA_DIR}/var/run:/var/run/rstudio-server
 
-# Activate Github Copilot
+# Activate GitHub Copilot
 echo "copilot-enabled=1" > "${SERVER_DATA_DIR}/rsession.conf"
 BINDS=$BINDS,${SERVER_DATA_DIR}/rsession.conf:/etc/rstudio/rsession.conf
 
@@ -120,4 +115,5 @@ apptainer run --no-home -B "$BINDS" \
   --auth-encrypt-password 0 \
   $(if [[ ! -z "${RSTUDIO_WHICH_R}" ]]; then echo --rsession-which-r "${RSTUDIO_WHICH_R}"; fi) \
   --rsession-path "${RSESSION_WRAPPER_FILE}" \
+  --rsession-proxy-max-wait-secs 60 \
   --server-data-dir='/tmp/run'
